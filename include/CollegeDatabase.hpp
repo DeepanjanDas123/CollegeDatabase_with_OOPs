@@ -8,6 +8,7 @@
 #include "Enrolment.hpp"
 #include "CourseApplication.hpp"
 #include "Faculty.hpp"
+#include "UserManager.hpp"
 
 class CollegeDatabase {
 private:
@@ -17,6 +18,7 @@ private:
     std::vector<Faculty> faculties;
     std::vector<CourseApplication> applications;
     int applicationCounter;
+    UserManager userManager;
 
     std::vector<Student*>::iterator findStudent(int id);
     std::vector<Course>::iterator findCourse(const std::string& id);
@@ -28,14 +30,23 @@ private:
     std::vector<Course>::const_iterator findCourse(const std::string& id) const;
     std::vector<Faculty>::const_iterator findFaculty(int id) const;
 
+    bool hasPermission(Role role, const std::string& action, int userID, const std::string& courseID = "") const;
+
 public:
     CollegeDatabase();
     ~CollegeDatabase();
+
+    User* getCurrentUser() const; // Added to access userManager.getCurrentUser()
+
+    bool login(const std::string& username, const std::string& password);
+    void logout();
+    bool addUser(const std::string& username, int id, Role role, const std::string& password);
 
     void addStudent(const std::string& type, int id, const std::string& name, const std::string& email, double cgpa);
     void updateStudent(int id, const std::string& name, const std::string& email, double cgpa);
     void deleteStudent(int id);
     void displayStudents() const;
+    void displayStudentInfo(int studentID) const;
 
     void addCourse(const std::string& id, const std::string& name, int credits, AllocationType alloc, int capacity);
     void updateCourse(const std::string& id, const std::string& name, int credits, AllocationType alloc, int capacity);
@@ -54,8 +65,9 @@ public:
 
     void addFaculty(int id, const std::string& name, bool isPermanent);
     void assignCourseToFaculty(int facultyID, const std::string& courseID);
+    void moveCourseToPast(int facultyID, const std::string& courseID);
     void applyForProject(int studentID, int facultyID);
     void displayFaculties() const;
 };
 
-#endif
+#endif // COLLEGE_DATABASE_HPP
