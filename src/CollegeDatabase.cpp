@@ -15,7 +15,57 @@ CollegeDatabase::~CollegeDatabase() {
     for (Student* student : students) delete student;
 }
 
+User* CollegeDatabase::getCurrentUser() const {
+    return userManager.getCurrentUser();
+}
+
+bool CollegeDatabase::hasPermission(Role role, const std::string& action, int userID, const std::string& courseID) const {
+    if (!userManager.getCurrentUser()) {
+        std::cout << "Error: No user logged in.\n";
+        return false;
+    }
+
+    if (role == Role::Student) {
+        if (action == "displayStudentInfo" && userID == userManager.getCurrentUser()->getID()) return true;
+        if (action == "displayFaculties") return true;
+        if (action == "applyForCourse" && userID == userManager.getCurrentUser()->getID()) return true;
+        if (action == "displayStudentCourses" && userID == userManager.getCurrentUser()->getID()) return true;
+        return false;
+    } else if (role == Role::Faculty) {
+        if (action == "displayStudents" || action == "displayFaculties" || action == "displayCourses" ||
+            action == "displayEnrollments" || action == "displayApplications") return true;
+        if (action == "assignCourseToFaculty" && userID == userManager.getCurrentUser()->getID()) return true;
+        if (action == "moveCourseToPast" && userID == userManager.getCurrentUser()->getID()) return true;
+        if (action == "applyForProject" && userID == userManager.getCurrentUser()->getID()) return true;
+        if (action == "updateGrade") {
+            auto facultyIt = findFaculty(userManager.getCurrentUser()->getID());
+            if (facultyIt != faculties.end()) {
+                auto it = std::find(facultyIt->getCurrentCourses().begin(), facultyIt->getCurrentCourses().end(), courseID);
+                return it != facultyIt->getCurrentCourses().end();
+            }
+            return false;
+        }
+        return false;
+    } else if (role == Role::Admin) {
+        return true; // Admins have access to all actions
+    }
+    return false;
+}
+
+bool CollegeDatabase::login(const std::string& username, const std::string& password) {
+    return userManager.login(username, password);
+}
+
+void CollegeDatabase::logout() {
+    userManager.logout();
+}
+
+bool CollegeDatabase::addUser(const std::string& username, int id, Role role, const std::string& password) {
+    return userManager.addUser(username, id, role, password);
+}
+
 void CollegeDatabase::addStudent(const std::string& type, int id, const std::string& name, const std::string& email, double cgpa) {
+    if (!hasPermission(Role::Admin, "addStudent", id)) return;
     if (findStudent(id) == students.end()) {
         if (type == "BTech") students.push_back(new BTech(id, name, email, cgpa));
         else if (type == "DualDegree") students.push_back(new DualDegree(id, name, email, cgpa));
@@ -29,6 +79,7 @@ void CollegeDatabase::addStudent(const std::string& type, int id, const std::str
 }
 
 void CollegeDatabase::updateStudent(int id, const std::string& name, const std::string& email, double cgpa) {
+    if (!hasPermission(Role::Admin, "updateStudent", id)) return;
     auto it = findStudent(id);
     if (it != students.end()) {
         (*it)->setName(name);
@@ -41,6 +92,7 @@ void CollegeDatabase::updateStudent(int id, const std::string& name, const std::
 }
 
 void CollegeDatabase::deleteStudent(int id) {
+    if (!hasPermission(Role::Admin, "deleteStudent", id)) return;
     auto it = findStudent(id);
     if (it != students.end()) {
         enrollments.erase(
@@ -66,11 +118,23 @@ void CollegeDatabase::deleteStudent(int id) {
 }
 
 void CollegeDatabase::displayStudents() const {
+    if (!hasPermission(Role::Faculty, "displayStudents", userManager.getCurrentUser() ? userManager.getCurrentUser()->getID() : -1)) return;
     if (students.empty()) { std::cout << "No students in the database.\n"; return; }
     for (const auto* student : students) student->display();
 }
 
+void CollegeDatabase::displayStudentInfo(int studentID) const {
+    if (!hasPermission(Role::Student, "displayStudentInfo", studentID)) return;
+    auto it = findStudent(studentID);
+    if (it != students.end()) {
+        (*it)->display();
+    } else {
+        std::cout << "Error: Student not found.\n";
+    }
+}
+
 void CollegeDatabase::addCourse(const std::string& id, const std::string& name, int credits, AllocationType alloc, int capacity) {
+    if (!hasPermission(Role::Admin, "addCourse", userManager.getCurrentUser() ? userManager.getCurrentUser()->getID() : -1)) return;
     if (findCourse(id) == courses.end()) {
         courses.emplace_back(id, name, credits, alloc, capacity);
         std::cout << "Course added successfully.\n";
@@ -80,6 +144,7 @@ void CollegeDatabase::addCourse(const std::string& id, const std::string& name, 
 }
 
 void CollegeDatabase::updateCourse(const std::string& id, const std::string& name, int credits, AllocationType alloc, int capacity) {
+    if (!hasPermission(Role::Admin, "updateCourse", userManager.getCurrentUser() ? userManager.getCurrentUser()->getID() : -1)) return;
     auto it = findCourse(id);
     if (it != courses.end()) {
         it->setName(name);
@@ -93,6 +158,7 @@ void CollegeDatabase::updateCourse(const std::string& id, const std::string& nam
 }
 
 void CollegeDatabase::deleteCourse(const std::string& id) {
+    if (!hasPermission(Role::Admin, "deleteCourse", userManager.getCurrentUser() ? userManager.getCurrentUser()->getID() : -1)) return;
     auto it = findCourse(id);
     if (it != courses.end()) {
         for (auto& faculty : faculties) faculty.moveCourseToPast(id);
@@ -112,11 +178,13 @@ void CollegeDatabase::deleteCourse(const std::string& id) {
 }
 
 void CollegeDatabase::displayCourses() const {
+    if (!hasPermission(Role::Faculty, "displayCourses", userManager.getCurrentUser() ? userManager.getCurrentUser()->getID() : -1)) return;
     if (courses.empty()) { std::cout << "No courses in the database.\n"; return; }
     for (const auto& course : courses) course.display();
 }
 
 void CollegeDatabase::applyForCourse(int studentID, const std::string& courseID, int priority) {
+    if (!hasPermission(Role::Student, "applyForCourse", studentID)) return;
     if (findStudent(studentID) == students.end()) {
         std::cout << "Error: Student not found.\n";
         return;
@@ -134,11 +202,13 @@ void CollegeDatabase::applyForCourse(int studentID, const std::string& courseID,
 }
 
 void CollegeDatabase::displayApplications() const {
+    if (!hasPermission(Role::Faculty, "displayApplications", userManager.getCurrentUser() ? userManager.getCurrentUser()->getID() : -1)) return;
     if (applications.empty()) { std::cout << "No applications in the database.\n"; return; }
     for (const auto& app : applications) app.display();
 }
 
 void CollegeDatabase::allocateCourses() {
+    if (!hasPermission(Role::Admin, "allocateCourses", userManager.getCurrentUser() ? userManager.getCurrentUser()->getID() : -1)) return;
     enrollments.clear();
     std::map<std::string, std::vector<int>> coursePreferences;
     std::random_device rd;
@@ -270,6 +340,7 @@ void CollegeDatabase::allocateCourses() {
 }
 
 void CollegeDatabase::enrollStudent(int studentID, const std::string& courseID) {
+    if (!hasPermission(Role::Admin, "enrollStudent", userManager.getCurrentUser() ? userManager.getCurrentUser()->getID() : -1)) return;
     if (findStudent(studentID) == students.end()) {
         std::cout << "Error: Student not found.\n";
         return;
@@ -287,6 +358,7 @@ void CollegeDatabase::enrollStudent(int studentID, const std::string& courseID) 
 }
 
 void CollegeDatabase::updateGrade(int studentID, const std::string& courseID, const std::string& grade) {
+    if (!hasPermission(Role::Faculty, "updateGrade", userManager.getCurrentUser() ? userManager.getCurrentUser()->getID() : -1, courseID)) return;
     auto it = findEnrollment(studentID, courseID);
     if (it != enrollments.end()) {
         it->setGrade(grade);
@@ -297,6 +369,7 @@ void CollegeDatabase::updateGrade(int studentID, const std::string& courseID, co
 }
 
 void CollegeDatabase::deleteEnrollment(int studentID, const std::string& courseID) {
+    if (!hasPermission(Role::Admin, "deleteEnrollment", userManager.getCurrentUser() ? userManager.getCurrentUser()->getID() : -1)) return;
     auto it = findEnrollment(studentID, courseID);
     if (it != enrollments.end()) {
         enrollments.erase(it);
@@ -307,11 +380,13 @@ void CollegeDatabase::deleteEnrollment(int studentID, const std::string& courseI
 }
 
 void CollegeDatabase::displayEnrollments() const {
+    if (!hasPermission(Role::Faculty, "displayEnrollments", userManager.getCurrentUser() ? userManager.getCurrentUser()->getID() : -1)) return;
     if (enrollments.empty()) { std::cout << "No enrollments in the database.\n"; return; }
     for (const auto& enrollment : enrollments) enrollment.display();
 }
 
 void CollegeDatabase::displayStudentCourses(int studentID) const {
+    if (!hasPermission(Role::Student, "displayStudentCourses", studentID)) return;
     auto studentIt = findStudent(studentID);
     if (studentIt == students.end()) {
         std::cout << "Error: Student not found.\n";
@@ -335,6 +410,7 @@ void CollegeDatabase::displayStudentCourses(int studentID) const {
 }
 
 void CollegeDatabase::addFaculty(int id, const std::string& name, bool isPermanent) {
+    if (!hasPermission(Role::Admin, "addFaculty", userManager.getCurrentUser() ? userManager.getCurrentUser()->getID() : -1)) return;
     if (findFaculty(id) == faculties.end()) {
         faculties.emplace_back(id, name, isPermanent);
         std::cout << "Faculty added successfully.\n";
@@ -344,6 +420,7 @@ void CollegeDatabase::addFaculty(int id, const std::string& name, bool isPermane
 }
 
 void CollegeDatabase::assignCourseToFaculty(int facultyID, const std::string& courseID) {
+    if (!hasPermission(Role::Faculty, "assignCourseToFaculty", facultyID)) return;
     auto facultyIt = findFaculty(facultyID);
     auto courseIt = findCourse(courseID);
     if (facultyIt == faculties.end()) {
@@ -358,7 +435,24 @@ void CollegeDatabase::assignCourseToFaculty(int facultyID, const std::string& co
     std::cout << "Course assigned to faculty successfully.\n";
 }
 
+void CollegeDatabase::moveCourseToPast(int facultyID, const std::string& courseID) {
+    if (!hasPermission(Role::Faculty, "moveCourseToPast", facultyID)) return;
+    auto facultyIt = findFaculty(facultyID);
+    auto courseIt = findCourse(courseID);
+    if (facultyIt == faculties.end()) {
+        std::cout << "Error: Faculty not found.\n";
+        return;
+    }
+    if (courseIt == courses.end()) {
+        std::cout << "Error: Course not found.\n";
+        return;
+    }
+    facultyIt->moveCourseToPast(courseID);
+    std::cout << "Course moved to past successfully.\n";
+}
+
 void CollegeDatabase::applyForProject(int studentID, int facultyID) {
+    if (!hasPermission(Role::Faculty, "applyForProject", facultyID)) return;
     auto studentIt = findStudent(studentID);
     if (studentIt == students.end()) {
         std::cout << "Error: Student not found.\n";
@@ -398,6 +492,7 @@ void CollegeDatabase::applyForProject(int studentID, int facultyID) {
 }
 
 void CollegeDatabase::displayFaculties() const {
+    if (!hasPermission(Role::Student, "displayFaculties", userManager.getCurrentUser() ? userManager.getCurrentUser()->getID() : -1)) return;
     if (faculties.empty()) { std::cout << "No faculties in the database.\n"; return; }
     for (const auto& faculty : faculties) faculty.display();
 }
