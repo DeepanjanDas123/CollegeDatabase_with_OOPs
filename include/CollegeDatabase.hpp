@@ -9,6 +9,8 @@
 #include "CourseApplication.hpp"
 #include "Faculty.hpp"
 #include "UserManager.hpp"
+#include "Project.hpp"
+#include "ProjectApplication.hpp"
 
 class CollegeDatabase {
 private:
@@ -17,7 +19,10 @@ private:
     std::vector<Enrollment> enrollments;
     std::vector<Faculty> faculties;
     std::vector<CourseApplication> applications;
+    std::vector<Project> projects;
+    std::vector<ProjectApplication> projectApplications;
     int applicationCounter;
+    int projectApplicationCounter;
     UserManager userManager;
 
     std::vector<Student*>::iterator findStudent(int id);
@@ -25,18 +30,21 @@ private:
     std::vector<Enrollment>::iterator findEnrollment(int studentID, const std::string& courseID);
     std::vector<CourseApplication>::iterator findApplication(int studentID, const std::string& courseID);
     std::vector<Faculty>::iterator findFaculty(int id);
+    std::vector<Project>::iterator findProject(const std::string& id);
+    std::vector<ProjectApplication>::iterator findProjectApplication(int studentID, const std::string& projectID);
 
     std::vector<Student*>::const_iterator findStudent(int id) const;
     std::vector<Course>::const_iterator findCourse(const std::string& id) const;
     std::vector<Faculty>::const_iterator findFaculty(int id) const;
+    std::vector<Project>::const_iterator findProject(const std::string& id) const;
 
-    bool hasPermission(Role role, const std::string& action, int userID, const std::string& courseID = "") const;
+    bool hasPermission(Role role, const std::string& action, int userID, const std::string& courseID = "", const std::string& projectID = "") const;
 
 public:
     CollegeDatabase();
     ~CollegeDatabase();
 
-    User* getCurrentUser() const; // Added to access userManager.getCurrentUser()
+    User* getCurrentUser() const;
 
     bool login(const std::string& username, const std::string& password);
     void logout();
@@ -68,6 +76,13 @@ public:
     void moveCourseToPast(int facultyID, const std::string& courseID);
     void applyForProject(int studentID, int facultyID);
     void displayFaculties() const;
+
+    void addProject(const std::string& id, const std::string& title, const std::string& description, ProjectType type, int facultyID, int vacancies);
+    void deleteProject(const std::string& id);
+    void displayProjects() const;
+    void applyForProject(int studentID, const std::string& projectID);
+    void displayProjectApplications() const;
+    void assignProjects();
 };
 
-#endif // COLLEGE_DATABASE_HPP
+#endif
