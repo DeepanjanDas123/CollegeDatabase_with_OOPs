@@ -7,7 +7,9 @@ void studentMenu(CollegeDatabase& db, int studentID) {
     std::cout << "2. View All Faculties\n";
     std::cout << "3. Apply for Course\n";
     std::cout << "4. View My Courses\n";
-    std::cout << "5. Logout\n";
+    std::cout << "5. View All Projects\n";
+    std::cout << "6. Apply for Project\n";
+    std::cout << "7. Logout\n";
     int choice;
     std::cin >> choice;
     switch (choice) {
@@ -31,6 +33,16 @@ void studentMenu(CollegeDatabase& db, int studentID) {
             db.displayStudentCourses(studentID);
             break;
         case 5:
+            db.displayProjects();
+            break;
+        case 6: {
+            std::string projectID;
+            std::cout << "Enter Project ID: ";
+            std::cin >> projectID;
+            db.applyForProject(studentID, projectID);
+            break;
+        }
+        case 7:
             db.logout();
             break;
         default:
@@ -43,13 +55,16 @@ void facultyMenu(CollegeDatabase& db, int facultyID) {
     std::cout << "1. View All Students\n";
     std::cout << "2. View All Courses\n";
     std::cout << "3. View All Enrollments\n";
-    std::cout << "4. View All Applications\n";
+    std::cout << "4. View All Course Applications\n";
     std::cout << "5. Assign Course to Self\n";
     std::cout << "6. Move Course to Past\n";
     std::cout << "7. Update Grade\n";
     std::cout << "8. Assign Project Advisee\n";
     std::cout << "9. View All Faculties\n";
-    std::cout << "10. Logout\n";
+    std::cout << "10. Add Project\n";
+    std::cout << "11. View All Projects\n";
+    std::cout << "12. View All Project Applications\n";
+    std::cout << "13. Logout\n";
     int choice;
     std::cin >> choice;
     switch (choice) {
@@ -86,7 +101,7 @@ void facultyMenu(CollegeDatabase& db, int facultyID) {
             std::cin >> studentID;
             std::cout << "Enter Course ID: ";
             std::cin >> courseID;
-            std::cout << "Enter Grade (S, A, B, C, D, E, P, F): ";
+            std::cout << "Enter Grade: ";
             std::cin >> grade;
             db.updateGrade(studentID, courseID, grade);
             break;
@@ -101,7 +116,31 @@ void facultyMenu(CollegeDatabase& db, int facultyID) {
         case 9:
             db.displayFaculties();
             break;
-        case 10:
+        case 10: {
+            std::string id, title, description, typeStr;
+            int vacancies;
+            std::cout << "Enter Project ID: ";
+            std::cin >> id;
+            std::cout << "Enter Title: ";
+            std::cin.ignore();
+            std::getline(std::cin, title);
+            std::cout << "Enter Description: ";
+            std::getline(std::cin, description);
+            std::cout << "Enter Project Type (BTP/DDP/RP): ";
+            std::cin >> typeStr;
+            std::cout << "Enter Number of Vacancies: ";
+            std::cin >> vacancies;
+            ProjectType type = (typeStr == "BTP" ? ProjectType::BTP : typeStr == "DDP" ? ProjectType::DDP : ProjectType::RP);
+            db.addProject(id, title, description, type, facultyID, vacancies);
+            break;
+        }
+        case 11:
+            db.displayProjects();
+            break;
+        case 12:
+            db.displayProjectApplications();
+            break;
+        case 13:
             db.logout();
             break;
         default:
@@ -125,12 +164,17 @@ void adminMenu(CollegeDatabase& db) {
     std::cout << "12. Update Grade\n";
     std::cout << "13. Delete Enrollment\n";
     std::cout << "14. View All Enrollments\n";
-    std::cout << "15. View All Applications\n";
+    std::cout << "15. View All Course Applications\n";
     std::cout << "16. Add Faculty\n";
     std::cout << "17. Assign Course to Faculty\n";
     std::cout << "18. Assign Project Advisee\n";
     std::cout << "19. View All Faculties\n";
-    std::cout << "20. Logout\n";
+    std::cout << "20. Add Project\n";
+    std::cout << "21. Delete Project\n";
+    std::cout << "22. View All Projects\n";
+    std::cout << "23. View All Project Applications\n";
+    std::cout << "24. Assign Projects\n";
+    std::cout << "25. Logout\n";
     int choice;
     std::cin >> choice;
     switch (choice) {
@@ -263,7 +307,7 @@ void adminMenu(CollegeDatabase& db) {
             std::cin >> studentID;
             std::cout << "Enter Course ID: ";
             std::cin >> courseID;
-            std::cout << "Enter Grade (S, A, B, C, D, E, P, F): ";
+            std::cout << "Enter Grade: ";
             std::cin >> grade;
             db.updateGrade(studentID, courseID, grade);
             break;
@@ -320,7 +364,45 @@ void adminMenu(CollegeDatabase& db) {
         case 19:
             db.displayFaculties();
             break;
-        case 20:
+        case 20: {
+            std::string id, title, description, typeStr;
+            int facultyID, vacancies;
+            std::cout << "Enter Project ID: ";
+            std::cin >> id;
+            std::cout << "Enter Title: ";
+            std::cin.ignore();
+            std::getline(std::cin, title);
+            std::cout << "Enter Description: ";
+            std::getline(std::cin, description);
+            std::cout << "Enter Project Type (BTP/DDP/RP): ";
+            std::cin >> typeStr;
+            std::cout << "Enter Faculty ID: ";
+            std::cin >> facultyID;
+            std::cout << "Enter Number of Vacancies: ";
+            std::cin >> vacancies;
+            ProjectType type = (typeStr == "BTP" ? ProjectType::BTP :
+                               typeStr == "DDP" ? ProjectType::DDP :
+                               typeStr == "RP" ? ProjectType::RP : ProjectType::BTP); // Default to BTP if invalid
+            db.addProject(id, title, description, type, facultyID, vacancies);
+            break;
+        }
+        case 21: {
+            std::string id;
+            std::cout << "Enter Project ID: ";
+            std::cin >> id;
+            db.deleteProject(id);
+            break;
+        }
+        case 22:
+            db.displayProjects();
+            break;
+        case 23:
+            db.displayProjectApplications();
+            break;
+        case 24:
+            db.assignProjects();
+            break;
+        case 25:
             db.logout();
             break;
         default:
@@ -352,6 +434,10 @@ int main() {
     db.addCourse("MATH201", "Calculus I", 4, AllocationType::FCFS, 1);
     db.addCourse("PHYS301", "Physics I", 3, AllocationType::Random, 2);
     db.addCourse("CHEM401", "Chemistry I", 3, AllocationType::RandomStratified, 2);
+
+    db.addProject("BTP001", "AI for Robotics", "Develop AI algorithms for robotic navigation", ProjectType::BTP, 101, 2);
+    db.addProject("DDP001", "Quantum Computing", "Simulate quantum algorithms", ProjectType::DDP, 101, 1);
+    db.addProject("RP001", "Machine Learning Theory", "Study theoretical aspects of ML", ProjectType::RP, 101, 2);
 
     db.enrollStudent(1, "CS101");
     db.enrollStudent(2, "CS101");

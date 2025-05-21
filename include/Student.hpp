@@ -10,6 +10,8 @@ class Student {
         std::string email;
         double cgpa;
         int totalCredits;
+        int projectGuide;
+        std::string assignedProject;
     
     public:
         Student(int id, const std::string& n, const std::string& e, double c, int tc = 0)
@@ -20,11 +22,13 @@ class Student {
         virtual std::string getEmail() const { return email; }
         virtual double getCGPA() const { return cgpa; }
         virtual int getTotalCredits() const { return totalCredits; }
+        std::string getAssignedProject() const { return assignedProject; }
 
         virtual void setName(const std::string& n) { name = n; }
         virtual void setEmail(const std::string& e) { email = e; }
         virtual void setCGPA(double c) { cgpa = c; }
         virtual void setTotalCredits(int tc) { totalCredits = tc; }
+        void assignProject(std::string project) { assignedProject = project; }
     
         virtual void display() const = 0;
         virtual std::string getStudentType() const = 0;

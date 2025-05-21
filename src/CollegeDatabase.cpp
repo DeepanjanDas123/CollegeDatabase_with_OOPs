@@ -9,7 +9,7 @@
 #include <queue>
 #include <iostream>
 
-CollegeDatabase::CollegeDatabase() : applicationCounter(0) {}
+CollegeDatabase::CollegeDatabase() : applicationCounter(0), projectApplicationCounter(0) {}
 
 CollegeDatabase::~CollegeDatabase() {
     for (Student* student : students) delete student;
@@ -19,7 +19,7 @@ User* CollegeDatabase::getCurrentUser() const {
     return userManager.getCurrentUser();
 }
 
-bool CollegeDatabase::hasPermission(Role role, const std::string& action, int userID, const std::string& courseID) const {
+bool CollegeDatabase::hasPermission(Role role, const std::string& action, int userID, const std::string& courseID, const std::string& projectID) const {
     if (!userManager.getCurrentUser()) {
         std::cout << "Error: No user logged in.\n";
         return false;
@@ -27,16 +27,19 @@ bool CollegeDatabase::hasPermission(Role role, const std::string& action, int us
 
     if (role == Role::Student) {
         if (action == "displayStudentInfo" && userID == userManager.getCurrentUser()->getID()) return true;
-        if (action == "displayFaculties") return true;
+        if (action == "displayFaculties" || action == "displayProjects") return true;
         if (action == "applyForCourse" && userID == userManager.getCurrentUser()->getID()) return true;
+        if (action == "applyForProject" && userID == userManager.getCurrentUser()->getID()) return true;
         if (action == "displayStudentCourses" && userID == userManager.getCurrentUser()->getID()) return true;
         return false;
     } else if (role == Role::Faculty) {
         if (action == "displayStudents" || action == "displayFaculties" || action == "displayCourses" ||
-            action == "displayEnrollments" || action == "displayApplications") return true;
+            action == "displayEnrollments" || action == "displayApplications" || action == "displayProjects" ||
+            action == "displayProjectApplications") return true;
         if (action == "assignCourseToFaculty" && userID == userManager.getCurrentUser()->getID()) return true;
         if (action == "moveCourseToPast" && userID == userManager.getCurrentUser()->getID()) return true;
         if (action == "applyForProject" && userID == userManager.getCurrentUser()->getID()) return true;
+        if (action == "addProject" && userID == userManager.getCurrentUser()->getID()) return true;
         if (action == "updateGrade") {
             auto facultyIt = findFaculty(userManager.getCurrentUser()->getID());
             if (facultyIt != faculties.end()) {
@@ -103,6 +106,10 @@ void CollegeDatabase::deleteStudent(int id) {
             std::remove_if(applications.begin(), applications.end(),
                 [id](const CourseApplication& a) { return a.getStudentID() == id; }),
             applications.end());
+        projectApplications.erase(
+            std::remove_if(projectApplications.begin(), projectApplications.end(),
+                [id](const ProjectApplication& a) { return a.getStudentID() == id; }),
+            projectApplications.end());
         for (auto& faculty : faculties) {
             faculty.removeBTechAdvisee(id);
             faculty.removeDualDegreeAdvisee(id);
@@ -547,6 +554,145 @@ void CollegeDatabase::displayFaculties() const {
     for (const auto& faculty : faculties) faculty.display();
 }
 
+void CollegeDatabase::addProject(const std::string& id, const std::string& title, const std::string& description, ProjectType type, int facultyID, int vacancies) {
+    User* currentUser = userManager.getCurrentUser();
+    if (currentUser->getRole() != Role::Admin && !hasPermission(Role::Faculty, "addProject", facultyID)) return;
+    if (findProject(id) != projects.end()) {
+        std::cout << "Error: Project ID already exists.\n";
+        return;
+    }
+    auto facultyIt = findFaculty(facultyID);
+    if (facultyIt == faculties.end()) {
+        std::cout << "Error: Faculty not found.\n";
+        return;
+    }
+    if (!facultyIt->getIsPermanent()) {
+        std::cout << "Error: Only permanent faculty can propose projects.\n";
+        return;
+    }
+    projects.emplace_back(id, title, description, type, facultyID, vacancies);
+    std::cout << "Project added successfully.\n";
+}
+
+void CollegeDatabase::deleteProject(const std::string& id) {
+    if (!hasPermission(Role::Admin, "deleteProject", userManager.getCurrentUser() ? userManager.getCurrentUser()->getID() : -1)) return;
+    auto it = findProject(id);
+    if (it != projects.end()) {
+        projectApplications.erase(
+            std::remove_if(projectApplications.begin(), projectApplications.end(),
+                [id](const ProjectApplication& a) { return a.getProjectID() == id; }),
+            projectApplications.end());
+        for (auto& student : students) {
+            if (student->getAssignedProject() == id) {
+                student->assignProject("");
+            }
+        }
+        projects.erase(it);
+        std::cout << "Project deleted successfully.\n";
+    } else {
+        std::cout << "Error: Project not found.\n";
+    }
+}
+
+void CollegeDatabase::displayProjects() const {
+    if (!hasPermission(Role::Student, "displayProjects", userManager.getCurrentUser() ? userManager.getCurrentUser()->getID() : -1)) return;
+    if (projects.empty()) { std::cout << "No projects in the database.\n"; return; }
+    for (const auto& project : projects) project.display();
+}
+
+void CollegeDatabase::applyForProject(int studentID, const std::string& projectID) {
+    if (!hasPermission(Role::Student, "applyForProject", studentID)) return;
+    auto studentIt = findStudent(studentID);
+    if (studentIt == students.end()) {
+        std::cout << "Error: Student not found.\n";
+        return;
+    }
+    auto projectIt = findProject(projectID);
+    if (projectIt == projects.end()) {
+        std::cout << "Error: Project not found.\n";
+        return;
+    }
+    if (findProjectApplication(studentID, projectID) != projectApplications.end()) {
+        std::cout << "Error: Student already applied to this project.\n";
+        return;
+    }
+    if (projectIt->getVacancies() <= 0) {
+        std::cout << "Error: No vacancies available for this project.\n";
+        return;
+    }
+    std::string studentType = (*studentIt)->getStudentType();
+    ProjectType projectType = projectIt->getType();
+    if ((studentType == "BTech" && projectType != ProjectType::BTP) ||
+        (studentType == "DualDegree" && projectType != ProjectType::DDP) ||
+        ((studentType == "MTech" || studentType == "PhD") && projectType != ProjectType::RP)) {
+        std::cout << "Error: Student type not eligible for this project type.\n";
+        return;
+    }
+    if ((*studentIt)->getAssignedProject() != "") {
+        std::cout << "Error: Student already assigned to a project.\n";
+        return;
+    }
+    projectApplications.emplace_back(studentID, projectID, projectApplicationCounter++);
+    std::cout << "Project application submitted successfully.\n";
+}
+
+void CollegeDatabase::displayProjectApplications() const {
+    if (!hasPermission(Role::Faculty, "displayProjectApplications", userManager.getCurrentUser() ? userManager.getCurrentUser()->getID() : -1)) return;
+    if (projectApplications.empty()) { std::cout << "No project applications in the database.\n"; return; }
+    for (const auto& app : projectApplications) app.display();
+}
+
+void CollegeDatabase::assignProjects() {
+    if (!hasPermission(Role::Admin, "assignProjects", userManager.getCurrentUser() ? userManager.getCurrentUser()->getID() : -1)) return;
+    
+    // Clear existing project assignments
+    for (auto& student : students) {
+        student->assignProject("");
+    }
+
+    for (auto& project : projects) {
+        project.setVacancies(project.getVacancies()); // Reset vacancies if needed
+        std::vector<ProjectApplication> projectApps;
+        for (const auto& app : projectApplications) {
+            if (app.getProjectID() == project.getProjectID()) {
+                projectApps.push_back(app);
+            }
+        }
+
+        // Sort applications by CGPA
+        std::sort(projectApps.begin(), projectApps.end(),
+            [&](const ProjectApplication& a, const ProjectApplication& b) {
+                auto s1 = findStudent(a.getStudentID());
+                auto s2 = findStudent(b.getStudentID());
+                return (*s1)->getCGPA() > (*s2)->getCGPA();
+            });
+
+        int vacancies = project.getVacancies();
+        for (const auto& app : projectApps) {
+            if (vacancies <= 0) break;
+            auto studentIt = findStudent(app.getStudentID());
+            if (studentIt != students.end() && (*studentIt)->getAssignedProject() == "") {
+                (*studentIt)->assignProject(project.getProjectID());
+                auto facultyIt = findFaculty(project.getFacultyID());
+                if (facultyIt != faculties.end()) {
+                    std::string studentType = (*studentIt)->getStudentType();
+                    if (studentType == "BTech") facultyIt->addBTechAdvisee(app.getStudentID());
+                    else if (studentType == "DualDegree") facultyIt->addDualDegreeAdvisee(app.getStudentID());
+                    else if (studentType == "MTech") facultyIt->addMTechAdvisee(app.getStudentID());
+                    else if (studentType == "PhD") facultyIt->addPhDAdvisee(app.getStudentID());
+                }
+                vacancies--;
+            }
+        }
+        project.setVacancies(vacancies);
+    }
+
+    // Clear project applications after assignment
+    projectApplications.clear();
+    projectApplicationCounter = 0;
+    std::cout << "Projects assigned successfully.\n";
+}
+
 std::vector<Student*>::iterator CollegeDatabase::findStudent(int id) {
     return std::find_if(students.begin(), students.end(),
         [id](const Student* s) { return s->getStudentID() == id; });
@@ -576,6 +722,18 @@ std::vector<Faculty>::iterator CollegeDatabase::findFaculty(int id) {
         [id](const Faculty& f) { return f.getFacultyID() == id; });
 }
 
+std::vector<Project>::iterator CollegeDatabase::findProject(const std::string& id) {
+    return std::find_if(projects.begin(), projects.end(),
+        [id](const Project& p) { return p.getProjectID() == id; });
+}
+
+std::vector<ProjectApplication>::iterator CollegeDatabase::findProjectApplication(int studentID, const std::string& projectID) {
+    return std::find_if(projectApplications.begin(), projectApplications.end(),
+        [studentID, projectID](const ProjectApplication& a) {
+            return a.getStudentID() == studentID && a.getProjectID() == projectID;
+        });
+}
+
 std::vector<Student*>::const_iterator CollegeDatabase::findStudent(int id) const {
     return std::find_if(students.begin(), students.end(),
         [id](const Student* s) { return s->getStudentID() == id; });
@@ -589,4 +747,9 @@ std::vector<Course>::const_iterator CollegeDatabase::findCourse(const std::strin
 std::vector<Faculty>::const_iterator CollegeDatabase::findFaculty(int id) const {
     return std::find_if(faculties.begin(), faculties.end(),
         [id](const Faculty& f) { return f.getFacultyID() == id; });
+}
+
+std::vector<Project>::const_iterator CollegeDatabase::findProject(const std::string& id) const {
+    return std::find_if(projects.begin(), projects.end(),
+        [id](const Project& p) { return p.getProjectID() == id; });
 }
