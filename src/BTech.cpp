@@ -9,6 +9,7 @@ void BTech::display() const{
                   << ", Name: " << name
                   << ", Email: " << email
                   << ", CGPA: " << cgpa
+                  << ", Total Credits: " << totalCredits
                   << ", BTP Guide: " << (BTP_guide == -1 ? "None" : std::to_string(BTP_guide))
                   << std::endl;
 }

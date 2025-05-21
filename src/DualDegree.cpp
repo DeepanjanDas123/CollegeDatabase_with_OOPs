@@ -9,6 +9,7 @@ void DualDegree::display() const {
                 << ", Name: " << name
                 << ", Email: " << email
                 << ", CGPA: " << cgpa
+                << ", Total Credits: " << totalCredits
                 << ", DDP Guide: " << (DDP_guide == -1 ? "None" : std::to_string(DDP_guide))
                 << std::endl;
 }

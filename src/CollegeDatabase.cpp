@@ -358,14 +358,63 @@ void CollegeDatabase::enrollStudent(int studentID, const std::string& courseID) 
 }
 
 void CollegeDatabase::updateGrade(int studentID, const std::string& courseID, const std::string& grade) {
-    if (!hasPermission(Role::Faculty, "updateGrade", userManager.getCurrentUser() ? userManager.getCurrentUser()->getID() : -1, courseID)) return;
-    auto it = findEnrollment(studentID, courseID);
-    if (it != enrollments.end()) {
-        it->setGrade(grade);
-        std::cout << "Grade updated successfully.\n";
-    } else {
+    User* currentUser = userManager.getCurrentUser();
+    if (currentUser->getRole() != Role::Admin && !hasPermission(Role::Faculty, "updateGrade", userManager.getCurrentUser() ? userManager.getCurrentUser()->getID() : -1, courseID)) return;
+    auto enrollmentIt = findEnrollment(studentID, courseID);
+    if (enrollmentIt == enrollments.end()) {
         std::cout << "Error: Enrollment not found.\n";
+        return;
     }
+    auto studentIt = findStudent(studentID);
+    auto courseIt = findCourse(courseID);
+    if (studentIt == students.end() || courseIt == courses.end()) {
+        std::cout << "Error: Student or course not found.\n";
+        return;
+    }
+
+    // Convert grade to numerical value
+    std::map<std::string, int> gradeMap = {
+        {"S", 10}, {"A", 9}, {"B", 8}, {"C", 7},
+        {"D", 6}, {"E", 5}, {"P", 4}, {"F", 0}
+    };
+    auto gradeIt = gradeMap.find(grade);
+    if (gradeIt == gradeMap.end()) {
+        std::cout << "Error: Invalid grade.\n";
+        return;
+    }
+    int gradeValue = gradeIt->second;
+    int courseCredits = courseIt->getCredits();
+
+    // Update CGPA and totalCredits
+    Student* student = *studentIt;
+    double currentCGPA = student->getCGPA();
+    int currentTotalCredits = student->getTotalCredits();
+
+    // Check if this is a new grade (no previous grade set)
+    bool isNewGrade = enrollmentIt->getGrade().empty() || enrollmentIt->getGrade() == "N/A";
+    if (isNewGrade) {
+        // Calculate new CGPA
+        if (currentTotalCredits >= 0) {
+            double temp = currentTotalCredits * currentCGPA;
+            temp += courseCredits * gradeValue;
+            currentTotalCredits += courseCredits;
+            double newCGPA = temp / currentTotalCredits;
+            student->setCGPA(newCGPA);
+            student->setTotalCredits(currentTotalCredits);
+        }
+    }
+    else{
+        int past_grade_value = gradeMap[enrollmentIt->getGrade()];
+        double temp = currentTotalCredits * currentCGPA;
+        temp -= courseCredits * past_grade_value;
+        temp += courseCredits * gradeValue;
+        double newCGPA = temp / currentTotalCredits;
+        student->setCGPA(newCGPA);
+    }
+
+    // Update the enrollment grade
+    enrollmentIt->setGrade(grade);
+    std::cout << "Grade updated successfully. New CGPA: " << student->getCGPA() << ", Total Credits: " << student->getTotalCredits() << "\n";
 }
 
 void CollegeDatabase::deleteEnrollment(int studentID, const std::string& courseID) {
@@ -420,7 +469,8 @@ void CollegeDatabase::addFaculty(int id, const std::string& name, bool isPermane
 }
 
 void CollegeDatabase::assignCourseToFaculty(int facultyID, const std::string& courseID) {
-    if (!hasPermission(Role::Faculty, "assignCourseToFaculty", facultyID)) return;
+    User* currentUser = userManager.getCurrentUser();
+    if (currentUser->getRole() != Role::Admin && !hasPermission(Role::Faculty, "assignCourseToFaculty", facultyID)) return;
     auto facultyIt = findFaculty(facultyID);
     auto courseIt = findCourse(courseID);
     if (facultyIt == faculties.end()) {
