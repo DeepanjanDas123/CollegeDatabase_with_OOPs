@@ -2,7 +2,7 @@
 
 ## Overview
 
-The College Database Management System is a robust C++ application designed to streamline academic record management for a college. It supports three user roles—Admin, Faculty, and Student—enabling functionalities like student and course management, enrollment, grade updates, project assignments, and user authentication. Built with a modular object-oriented design, the system uses inheritance for student types (BTech, DualDegree, MTech, PhD) and manages data through a central `CollegeDatabase` class.
+The College Database Management System is a robust C++ application designed to streamline academic record management for a college. It supports three user roles—Admin, Faculty, and Student—enabling functionalities like student and course management, enrollment, grade updates, project assignments, and user authentication. Built with a modular object-oriented design, the system uses inheritance for student types (BTech, DualDegree, MTech, PhD) and manages data through a central `CollegeDatabase` class. It allocates courses based on their allocation type, following the Gale Shapley algorithm to match students with their best courses possible, such that there exists no unstable matchings. Check out Gale Shapley algorithm here -> https://en.wikipedia.org/wiki/Gale%E2%80%93Shapley_algorithm
 
 Key features include:
 
