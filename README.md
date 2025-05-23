@@ -28,7 +28,7 @@ This project showcases advanced C++ programming, object-oriented design, and pra
 
    ```bash
    git clone <repository_url>
-   cd college-database
+   cd CollegeDatabase_with_OOPs
    ```
 2. **Create Build Directory**:
 
